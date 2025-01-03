@@ -239,14 +239,17 @@ EOF
   info "Postfix and OpenDKIM configured successfully."
 }
 
+# Install SSL
 install_ssl() {
   if [[ "$INSTALL_SSL" == "yes" ]]; then
     info "Checking DNS records for $DOMAIN and mail.$DOMAIN..."
 
+    local dns_errors=false
+
     # Check DNS A record for the primary domain
     if ! dig +short "$DOMAIN" | grep -q "$SERVER_IP"; then
       log "DNS record for $DOMAIN is not pointing to $SERVER_IP."
-      echo "Error: DNS record for $DOMAIN is missing or incorrect."
+      echo "Warning: DNS record for $DOMAIN is missing or incorrect."
       echo "Instructions to fix:"
       echo "  1. Log in to your domain registrar's DNS management panel."
       echo "  2. Add or update an A record for $DOMAIN:"
@@ -256,13 +259,13 @@ install_ssl() {
       echo "  3. Wait for DNS propagation (can take up to 24 hours)."
       echo "  4. Verify the DNS record with:"
       echo "     dig +short $DOMAIN"
-      exit 1
+      dns_errors=true
     fi
 
     # Check DNS A record for the mail subdomain
     if ! dig +short "mail.$DOMAIN" | grep -q "$SERVER_IP"; then
       log "DNS record for mail.$DOMAIN is not pointing to $SERVER_IP."
-      echo "Error: DNS record for mail.$DOMAIN is missing or incorrect."
+      echo "Warning: DNS record for mail.$DOMAIN is missing or incorrect."
       echo "Instructions to fix:"
       echo "  1. Log in to your domain registrar's DNS management panel."
       echo "  2. Add or update an A record for mail.$DOMAIN:"
@@ -272,14 +275,21 @@ install_ssl() {
       echo "  3. Wait for DNS propagation (can take up to 24 hours)."
       echo "  4. Verify the DNS record with:"
       echo "     dig +short mail.$DOMAIN"
-      exit 1
+      dns_errors=true
     fi
 
+    # If there are DNS errors, skip SSL installation
+    if [[ "$dns_errors" == true ]]; then
+      log "Skipping SSL installation due to DNS errors."
+      echo "Note: SSL installation has been skipped. Resolve the DNS issues above and re-run the script to install SSL."
+      return
+    fi
+
+    # Proceed with SSL installation
     info "DNS records verified. Proceeding with SSL installation..."
     sudo certbot --apache -d "server.$DOMAIN" -d "$DOMAIN" -d "mail.$DOMAIN" || {
       log "Certbot failed to issue certificates. Check /var/log/letsencrypt/letsencrypt.log for details."
       echo "Error: Certbot failed. Verify DNS records and retry."
-      exit 1
     }
 
     info "SSL certificates installed successfully."
