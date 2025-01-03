@@ -175,35 +175,68 @@ EOF
   fi
 }
 
-# Configure Postfix and DKIM
 configure_postfix_dkim() {
   info "Setting up Postfix and OpenDKIM..."
+  
+  # Install OpenDKIM
   sudo apt install -y opendkim opendkim-tools
+
+  # Create necessary directories
   ensure_directory "/etc/opendkim/keys/$DOMAIN"
+
+  # Generate DKIM keys
   cd "/etc/opendkim/keys/$DOMAIN"
   sudo opendkim-genkey -s mail -d "$DOMAIN"
   sudo chown -R opendkim:opendkim /etc/opendkim
+  sudo chmod -R 700 /etc/opendkim
 
+  # Configure OpenDKIM
   sudo tee /etc/opendkim.conf <<EOF > /dev/null
-Syslog yes
-LogWhy yes
-Domain $DOMAIN
-KeyFile /etc/opendkim/keys/$DOMAIN/mail.private
-Selector mail
-Socket local:/var/spool/postfix/opendkim/opendkim.sock
-Canonicalization relaxed/simple
-OversignHeaders From
-AutoRestart Yes
+Syslog                  yes
+LogWhy                  yes
+UMask                   002
+Domain                  $DOMAIN
+KeyTable                /etc/opendkim/key.table
+SigningTable            /etc/opendkim/signing.table
+ExternalIgnoreList      /etc/opendkim/trusted.hosts
+InternalHosts           /etc/opendkim/trusted.hosts
+Socket                  local:/var/spool/postfix/opendkim/opendkim.sock
+Canonicalization        relaxed/simple
+OversignHeaders         From
+AutoRestart             yes
+PidFile                 /var/run/opendkim/opendkim.pid
 EOF
 
-  sudo tee /etc/opendkim/TrustedHosts <<EOF > /dev/null
+  # Configure key table, signing table, and trusted hosts
+  sudo tee /etc/opendkim/key.table <<EOF > /dev/null
+mail._domainkey.$DOMAIN $DOMAIN:mail:/etc/opendkim/keys/$DOMAIN/mail.private
+EOF
+
+  sudo tee /etc/opendkim/signing.table <<EOF > /dev/null
+*@${DOMAIN} mail._domainkey.$DOMAIN
+EOF
+
+  sudo tee /etc/opendkim/trusted.hosts <<EOF > /dev/null
 127.0.0.1
 localhost
 $SERVER_IP
 $DOMAIN
 EOF
 
-  sudo systemctl restart opendkim postfix
+  # Restart OpenDKIM and Postfix
+  sudo systemctl restart opendkim || {
+    log "OpenDKIM failed to restart. Check /var/log/syslog for details."
+    echo "Error: OpenDKIM failed to restart. Run 'sudo journalctl -xeu opendkim.service' to debug."
+    exit 1
+  }
+
+  sudo systemctl restart postfix || {
+    log "Postfix failed to restart. Check /var/log/mail.log for details."
+    echo "Error: Postfix failed to restart. Run 'sudo journalctl -xeu postfix.service' to debug."
+    exit 1
+  }
+
+  info "Postfix and OpenDKIM configured successfully."
 }
 
 # Install SSL
