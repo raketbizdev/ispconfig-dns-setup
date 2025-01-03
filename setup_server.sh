@@ -65,20 +65,26 @@ read_inputs() {
   read -p "Would you like to install SSL using Let's Encrypt? (yes/no): " INSTALL_SSL
 }
 
-# Set hostname
+# Set hostname and update /etc/hosts
 set_hostname() {
-  info "Setting hostname to server.$DOMAIN..."
-  sudo hostnamectl set-hostname "server.$DOMAIN"
+  local hostname="server.$DOMAIN"
+  info "Setting hostname to $hostname..."
+  sudo hostnamectl set-hostname "$hostname"
+
+  info "Updating /etc/hosts..."
   sudo tee /etc/hosts <<EOF > /dev/null
 127.0.0.1 localhost
-127.0.0.1 server.$DOMAIN
-$SERVER_IP server.$DOMAIN
+127.0.1.1 $hostname
+$SERVER_IP $hostname
 EOF
+  info "Hostname and /etc/hosts updated successfully."
 }
 
 # Configure Bind9 for NS and DNS Zones
 configure_bind9() {
   info "Configuring Bind9 for ns1 and ns2..."
+
+  # Write named.conf.local
   sudo tee /etc/bind/named.conf.local <<EOF > /dev/null
 zone "$DOMAIN" {
     type master;
@@ -95,7 +101,7 @@ EOF
   sudo tee /etc/bind/db.$DOMAIN <<EOF > /dev/null
 \$TTL    604800
 @       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. (
-                              2         ; Serial
+                              $(date +%Y%m%d%H) ; Serial
                          604800         ; Refresh
                           86400         ; Retry
                         2419200         ; Expire
@@ -115,7 +121,7 @@ EOF
   sudo tee /etc/bind/db.mail.$DOMAIN <<EOF > /dev/null
 \$TTL    604800
 @       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. (
-                              2         ; Serial
+                              $(date +%Y%m%d%H) ; Serial
                          604800         ; Refresh
                           86400         ; Retry
                         2419200         ; Expire
@@ -126,7 +132,18 @@ EOF
 @       IN      A       $SERVER_IP
 EOF
 
+  # Restart Bind9
+  info "Restarting Bind9 service..."
   sudo systemctl restart bind9
+
+  # Check Bind9 status
+  if systemctl is-active --quiet bind9; then
+    info "Bind9 restarted successfully."
+  else
+    log "Bind9 failed to restart. Check /var/log/syslog for details."
+    echo "Error: Bind9 failed to restart. Use 'journalctl -xeu bind9.service' to debug."
+    exit 1
+  fi
 }
 
 # Configure Postfix and DKIM
