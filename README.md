@@ -39,6 +39,18 @@ sudo ./setup_server.sh
 
 ---
 
+### 3. Run the ISPconfig Installation 
+
+Run the setup script directly from the repository:
+
+```bash
+curl -O https://raw.githubusercontent.com/raketbizdev/ispconfig-dns-setup/refs/heads/main/install_ispconfig.sh
+chmod +x install_ispconfig.sh
+sudo ./install_ispconfig.sh
+```
+
+---
+
 ## DNS Records
 
 ### Required DNS Records

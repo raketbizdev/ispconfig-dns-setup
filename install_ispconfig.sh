@@ -48,16 +48,22 @@ install_prerequisites() {
 # Download ISPConfig
 download_ispconfig() {
   info "Downloading ISPConfig..."
-  wget -O /tmp/ispconfig.tar.gz "$ISP_CONFIG_DOWNLOAD_URL"
+  wget -O /tmp/ispconfig.tar.gz "$ISP_CONFIG_DOWNLOAD_URL" || error "Failed to download ISPConfig. Check your internet connection."
 
   info "Extracting ISPConfig installer..."
   mkdir -p "$ISP_CONFIG_INSTALL_DIR"
-  tar -xvzf /tmp/ispconfig.tar.gz -C "$ISP_CONFIG_INSTALL_DIR"
+  tar -xvzf /tmp/ispconfig.tar.gz -C "$ISP_CONFIG_INSTALL_DIR" || error "Failed to extract ISPConfig files."
 }
 
 # Install ISPConfig
 install_ispconfig() {
   info "Starting ISPConfig installation..."
+
+  # Ensure the install directory exists
+  if [[ ! -d "$ISP_CONFIG_INSTALL_DIR/install" ]]; then
+    error "Installation directory not found: $ISP_CONFIG_INSTALL_DIR/install"
+  fi
+
   cd "$ISP_CONFIG_INSTALL_DIR/install/"
 
   # Run ISPConfig installer
