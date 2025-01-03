@@ -55,16 +55,20 @@ download_ispconfig() {
   tar -xvzf /tmp/ispconfig.tar.gz -C "$ISP_CONFIG_INSTALL_DIR" || error "Failed to extract ISPConfig files."
 }
 
+# Find the install directory
+find_install_dir() {
+  info "Locating the ISPConfig installation directory..."
+  ISP_INSTALL_PATH=$(find "$ISP_CONFIG_INSTALL_DIR" -type d -name "install" 2>/dev/null)
+  if [[ -z "$ISP_INSTALL_PATH" ]]; then
+    error "Installation directory not found after extraction. Check the downloaded package structure."
+  fi
+  info "Found installation directory: $ISP_INSTALL_PATH"
+}
+
 # Install ISPConfig
 install_ispconfig() {
   info "Starting ISPConfig installation..."
-
-  # Ensure the install directory exists
-  if [[ ! -d "$ISP_CONFIG_INSTALL_DIR/install" ]]; then
-    error "Installation directory not found: $ISP_CONFIG_INSTALL_DIR/install"
-  fi
-
-  cd "$ISP_CONFIG_INSTALL_DIR/install/"
+  cd "$ISP_INSTALL_PATH"
 
   # Run ISPConfig installer
   php install.php || error "ISPConfig installation failed. Check the logs for details."
@@ -89,6 +93,7 @@ final_instructions() {
 log "Starting ISPConfig installation script"
 install_prerequisites
 download_ispconfig
+find_install_dir
 install_ispconfig
 cleanup
 final_instructions
