@@ -77,8 +77,17 @@ set_hostname() {
 127.0.1.1 $hostname
 $SERVER_IP $hostname
 EOF
+
+  # Test hostname resolution
+  if ! ping -c 1 "$hostname" &>/dev/null; then
+    log "Hostname resolution failed for $hostname. Check /etc/hosts configuration."
+    echo "Error: Hostname resolution failed for $hostname. Ensure /etc/hosts is correct."
+    exit 1
+  fi
+
   info "Hostname and /etc/hosts updated successfully."
 }
+
 
 # Configure Bind9 for NS and DNS Zones
 configure_bind9() {
@@ -131,6 +140,26 @@ EOF
 @       IN      NS      ns2.$DOMAIN.
 @       IN      A       $SERVER_IP
 EOF
+
+  # Validate Bind9 configuration
+  if ! sudo named-checkconf &>/dev/null; then
+    log "Bind9 configuration validation failed. Check named.conf.local."
+    echo "Error: Bind9 configuration validation failed. Run 'sudo named-checkconf'."
+    exit 1
+  fi
+
+  # Validate each zone file
+  if ! sudo named-checkzone "$DOMAIN" /etc/bind/db."$DOMAIN" &>/dev/null; then
+    log "Zone validation failed for $DOMAIN. Check /etc/bind/db.$DOMAIN."
+    echo "Error: Zone validation failed for $DOMAIN. Run 'sudo named-checkzone'."
+    exit 1
+  fi
+
+  if ! sudo named-checkzone "mail.$DOMAIN" /etc/bind/db.mail."$DOMAIN" &>/dev/null; then
+    log "Zone validation failed for mail.$DOMAIN. Check /etc/bind/db.mail.$DOMAIN."
+    echo "Error: Zone validation failed for mail.$DOMAIN. Run 'sudo named-checkzone'."
+    exit 1
+  fi
 
   # Restart Bind9
   info "Restarting Bind9 service..."
