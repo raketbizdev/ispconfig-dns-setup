@@ -58,7 +58,7 @@ download_ispconfig() {
 # Find the install directory
 find_install_dir() {
   info "Locating the ISPConfig installation directory..."
-  ISP_INSTALL_PATH=$(find "$ISP_CONFIG_INSTALL_DIR" -type d -name "install" 2>/dev/null)
+  ISP_INSTALL_PATH=$(find "$ISP_CONFIG_INSTALL_DIR" -type d -name "install" | head -n 1)
   if [[ -z "$ISP_INSTALL_PATH" ]]; then
     error "Installation directory not found after extraction. Check the downloaded package structure."
   fi
